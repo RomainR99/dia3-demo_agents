@@ -1,11 +1,15 @@
 import streamlit as st 
 from llm_agent import ConversationAgent
-
+from config import (
+	APP_TITLE,
+	CHAT_PLACEHOLDER,
+	PAGE_TITLE,
+)
 
 class UserInterface:
 	def __init__(self):
-		st.set_page_config(page_title="Jarvis")
-		st.title("Barbe-Quasar")
+		st.set_page_config(page_title=APP_TITLE)
+		st.title(PAGE_TITLE)
 		self.conversation_agent_object = self.get_persistant_conversation_agent()
 
 
@@ -25,15 +29,20 @@ class UserInterface:
 
 	def run(self):
 		text_interaction = st.chat_input(
-			"Que veux tu moussaillon ?",
+			CHAT_PLACEHOLDER,
 			accept_file=False,
-			accept_audio=False
+			accept_audio=True
 			)
 
 		if text_interaction :
 			self.conversation_agent_object.ask_llm(text_interaction)
 			self.show_discussion_history()
+	
+	def show_message(self, message):
+		if message.get("speech"):
+			st.audio(message["speech"], format="audio/wav")
 
+	
 
 
 if __name__ == "__main__":

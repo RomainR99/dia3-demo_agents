@@ -3,11 +3,14 @@ from groq import Groq
 from dotenv import load_dotenv
 import os
 
+from speech_text import speech_text
+
 
 class ConversationAgent:
     def __init__(self):
         load_dotenv()
         self.groq_client = Groq(api_key=os.environ["GROQ_KEY"])
+        self.speech_text = speech_text(self.groq_client)
         self.conversation_history = [
                 {
                     "role": "system",
@@ -25,22 +28,33 @@ class ConversationAgent:
     def get_conversation_history(self):
         return self.conversation_history[1: ]
 
+    def update_conversation_history(self, role, content, speech=None):
+        message = {
+        "role": role,
+        "content": content,
+        }
+        if speech is not None:
+            message["speech"] = speech
+        self.conversation_history.append(message) # le message contient le speech now
 
-    def update_conversation_history(self, role, content):
-        self.conversation_history.append(
-            {
-            "role": role,
-            "content": content,
-            }
-        )
 
 
     def ask_llm(self, text_interaction):
+        #pour la memoire de l'audio
+        if text_interaction.audio is not None:
+            question = self.speech_text.transcribe(text_interaction.audio)
+        else:
+            question = text_interaction.text
 
-        self.update_conversation_history(role="user", content=text_interaction)
+        self.update_conversation_history(role="user", content=question)
+
+        messages = [
+            {"role": message["role"], "content": message["content"]}
+            for message in self.conversation_history
+        ]
 
         response = self.groq_client.chat.completions.create(
-            messages=self.conversation_history,
+            messages=messages,
             model="openai/gpt-oss-120b",
             include_reasoning=False,
         ).choices[0].message.content
@@ -48,6 +62,7 @@ class ConversationAgent:
 
         self.update_conversation_history(role="assistant", content=response)
 
+   
 
 
 
