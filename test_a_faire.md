@@ -1,5 +1,7 @@
 # Tests à faire
 
+26 tests à faire. 21 déjà faits. 47 au total.
+
 ✅ essai déjà exécuté. ☐ pas encore fait.
 
 Les essais cochés ont été lancés à la main, le 22 octobre 2026, pas par une suite automatique.
