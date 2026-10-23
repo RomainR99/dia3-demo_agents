@@ -1,8 +1,9 @@
 from groq import Groq
-
+import base64
 from dotenv import load_dotenv
 import os
 
+from config import IMAGE_ONLY_QUESTION, TEXT_MODEL, VISION_MODEL
 from speech_text import speech_text
 
 
@@ -25,70 +26,80 @@ class ConversationAgent:
             return file.read()
 
 
-    def get_conversation_history(self):
-        return self.conversation_history[1: ]
+    @staticmethod
+    def encode_image(image):
+        return base64.b64encode(image).decode("utf-8")
 
-    def update_conversation_history(self, role, content, speech=None):
+
+    def get_conversation_history(self):
+        return self.conversation_history[1:]
+
+
+    @staticmethod
+    def build_content(text_interaction, image=None):
+        if not image:
+            return text_interaction
+
+        content = []
+        if text_interaction:
+            content.append({
+                "type": "text",
+                "text": text_interaction,
+            })
+        content.append({
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:image/jpeg;base64,{ConversationAgent.encode_image(image)}",
+            },
+        })
+        return content
+
+
+    def history_has_image(self):
+        for message in self.conversation_history:
+            content = message.get("content")
+            if not isinstance(content, list):
+                continue
+            for part in content:
+                if isinstance(part, dict) and part.get("type") == "image_url":
+                    return True
+        return False
+
+
+    def update_conversation_history(self, role, text_interaction, image=None, speech=None):
         message = {
-        "role": role,
-        "content": content,
+            "role": role,
+            "content": self.build_content(text_interaction, image),
         }
         if speech is not None:
             message["speech"] = speech
-        self.conversation_history.append(message) # le message contient le speech now
+        self.conversation_history.append(message)
 
 
+    def transcribe(self, audio_file):
+        return self.speech_text.transcribe(audio_file)
 
-    def ask_llm(self, text_interaction):
-        #pour la memoire de l'audio
-        if text_interaction.audio is not None:
-            question = self.speech_text.transcribe(text_interaction.audio)
-        else:
-            question = text_interaction.text
 
-        self.update_conversation_history(role="user", content=question)
+    def ask_llm(self, text_interaction, image=None):
+        if image and not text_interaction:
+            text_interaction = IMAGE_ONLY_QUESTION
+
+        self.update_conversation_history(role="user", text_interaction=text_interaction, image=image)
 
         messages = [
             {"role": message["role"], "content": message["content"]}
             for message in self.conversation_history
         ]
 
+        model = VISION_MODEL if self.history_has_image() else TEXT_MODEL
         response = self.groq_client.chat.completions.create(
             messages=messages,
-            model="openai/gpt-oss-120b",
+            model=model,
             include_reasoning=False,
         ).choices[0].message.content
 
-
-        self.update_conversation_history(role="assistant", content=response)
-
-   
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        self.update_conversation_history(role="assistant", text_interaction=response)
+        return response
 
 
 if __name__ == "__main__":
